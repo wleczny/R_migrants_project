@@ -1,0 +1,365 @@
+---
+title: "migrants_project"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
+
+
+
+
+1) Making filtered data set:
+```{r}
+library(plyr)
+library(limma)
+library(pracma)
+library(vioplot)
+filtered <- read.columns("./data/MissingMigrants.csv", c("Region of Incident", "Reported Year", "Reported Month", "Number Dead", "Minimum Estimated Number of Missing", "Number of Survivors", "Number of Females", "Number of Males", "Number of Children", "Cause of Death", "Migration Route"), sep = ",")
+write.csv(filtered, file="./data/FilteredMissingMigrants.csv",row.names=FALSE)
+```
+
+2) Where people migrate from (pie chart):
+```{r}
+regionOrdering <- c("North Africa", "Horn of Africa", "Sub-Saharan Africa", "Mediterranean", "Europe", "Central America", "US-Mexico Border", "Other")
+dataFrame = read.csv("./data/FilteredMissingMigrants.csv")
+from_where <- count(dataFrame, "Region.of.Incident")
+other = 0
+del <- c()
+for(i in 1:nrow(from_where)){
+  if(from_where[i,2] < 200)
+  {
+    other <- other + from_where[i,2]
+    del <- c(del,i)
+  }
+}
+from_where <- from_where[-del,]
+newRow <- data.frame(Region.of.Incident = "Other", freq = other)
+from_where <- rbind(from_where, newRow)
+
+numbers = c()
+for(i in 1:nrow(from_where)){
+  for(j in 1:nrow(from_where))
+  {
+    if(from_where$Region.of.Incident[j] == regionOrdering[i])
+    {
+      numbers = c(numbers, from_where$freq[j] + 1)
+    }
+  }
+}
+from_where$Region.of.Incident = regionOrdering
+from_where$freq = numbers
+
+barplot(from_where$freq,
+        main = "Where do people migrate from",
+        xlab = "Amount of people",
+        ylab = "Region",
+        names.arg = from_where$Region.of.Incident,
+        col = "green")
+
+pie(from_where$freq, from_where$Region.of.Incident, main = "Where people migrate from", col = rainbow(length(from_where$freq)))
+```
+
+3)Where people migrate to:
+```{r}
+#regionOrdering <- c("North Africa", "Horn of Africa", "Sub-Saharan Africa", "Mediterranean", "Europe", "Central America", "US-Mexico Border", "Other")
+where_to <- count(dataFrame, "Migration.Route")
+other = 0
+del <- c()
+for(i in 1:nrow(where_to)){
+  if(where_to[i,2] < 50)
+  {
+    other <- other + where_to[i,2]
+    del <- c(del,i)
+  }
+}
+del <- c(del,1)
+where_to <- where_to[-del,]
+newRow <- data.frame(Migration.Route = "Other", freq = other)
+where_to <- rbind(where_to, newRow)
+
+barplot(where_to$freq,
+        main = "Migration routes",
+        xlab = "Amount of people",
+        ylab = "Region",
+        names.arg = where_to$Migration.Route,
+        col = "green")
+
+```
+
+4)Amount of migrations by month (barplot):
+```{r}
+dataOrdering= c("Jan 2014", "Feb 2014", "Mar 2014", "Apr 2014", "May 2014", "Jun 2014", "Jul 2014", "Aug 2014", "Sep 2014", "Oct 2014", "Nov 2014", "Dec 2014","Jan 2015", "Feb 2015", "Mar 2015", "Apr 2015", "May 2015", "Jun 2015", "Jul 2015", "Aug 2015", "Sep 2015", "Oct 2015", "Nov 2015", "Dec 2015","Jan 2016", "Feb 2016", "Mar 2016", "Apr 2016", "May 2016", "Jun 2016", "Jul 2016", "Aug 2016", "Sep 2016", "Oct 2016", "Nov 2016", "Dec 2016","Jan 2017", "Feb 2017", "Mar 2017", "Apr 2017", "May 2017", "Jun 2017", "Jul 2017", "Aug 2017", "Sep 2017", "Oct 2017", "Nov 2017", "Dec 2017","Jan 2018", "Feb 2018", "Mar 2018", "Apr 2018", "May 2018", "Jun 2018", "Jul 2018", "Aug 2018", "Sep 2018", "Oct 2018", "Nov 2018", "Dec 2018","Jan 2019", "Feb 2019", "Mar 2019")
+all_migrants = c()
+month_year = c()
+for(i in 1:nrow(dataFrame)){
+  sum = 0
+  val = dataFrame$Minimum.Estimated.Number.of.Missing[i]
+  mr_val = paste(dataFrame$Reported.Month[i], dataFrame$Reported.Year[i], sep=" ")
+  if(!is.na(val))
+  {
+    sum = sum + val
+  }
+  val = dataFrame$Number.of.Survivors[i]
+  if(!is.na(val))
+  {
+    sum = sum + val
+  }
+  val = dataFrame$Number.Dead[i]
+  if(!is.na(val))
+  {
+    sum = sum + val
+  }
+  all_migrants = c(all_migrants, sum)
+  month_year = c(month_year, mr_val)
+}
+dataFrame2 <- data.frame(Date = month_year, Migrants = all_migrants)
+migAmountByDate <- aggregate(dataFrame2$Migrants, by=list(Date=dataFrame2$Date), FUN=sum)
+
+all_migrants = c()
+for(i in 1:nrow(migAmountByDate)){
+  for(j in 1:nrow(migAmountByDate))
+  {
+    if(migAmountByDate$Date[j] == dataOrdering[i])
+    {
+      all_migrants = c(all_migrants, migAmountByDate$x[j] + 1)
+    }
+  }
+}
+migAmountByDate$Date = dataOrdering
+migAmountByDate$x = all_migrants
+
+barplot(migAmountByDate$x,
+        main = "Amount of migrations by month",
+        xlab = "Month",
+        ylab = "Amount of people",
+        names.arg = migAmountByDate$Date,
+        col = "green")
+
+```
+
+4) Amount of migrations by month (barplot):
+```{r}
+monthOrdering= c("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+
+all_migrants = c()
+month = dataFrame$Reported.Month
+
+for(i in 1:nrow(dataFrame)){
+  sum = 0
+  val = dataFrame$Minimum.Estimated.Number.of.Missing[i]
+  if(!is.na(val))
+  {
+    sum = sum + val
+  }
+  val = dataFrame$Number.of.Survivors[i]
+  if(!is.na(val))
+  {
+    sum = sum + val
+  }
+  val = dataFrame$Number.Dead[i]
+  if(!is.na(val))
+  {
+    sum = sum + val
+  }
+  all_migrants = c(all_migrants, sum)
+}
+
+dataFrame2 <- data.frame(Month = month, Migrants = all_migrants)
+migAmountByMonth <- aggregate(dataFrame2$Migrants, by=list(Month=dataFrame2$Month), FUN=sum)
+
+all_migrants = c()
+for(i in 1:nrow(migAmountByMonth)){
+  for(j in 1:nrow(migAmountByMonth))
+  {
+    if(strcmp(toString(migAmountByMonth$Month[j]),toString(monthOrdering[i])))
+    {
+      all_migrants = c(all_migrants, migAmountByMonth$x[j] + 1)
+    }
+  }
+}
+migAmountByMonth$Month = monthOrdering
+migAmountByMonth$x = all_migrants
+
+
+
+barplot(migAmountByMonth$x,
+        main = "Amount of migrations by month",
+        xlab = "Amount of migrationg people",
+        ylab = "Month",
+        names.arg = migAmountByMonth$Month,
+        col = "green")
+
+
+```
+
+5) How many die/survive/are missing
+```{r}
+deadImm = c()
+for(i in 1:nrow(dataFrame)){
+  val = dataFrame$Number.Dead[i]
+  if(!is.na(val))
+  {
+    deadImm = c(deadImm, val)
+  }
+}
+
+missingImm = c()
+for(i in 1:nrow(dataFrame)){
+  val = dataFrame$Minimum.Estimated.Number.of.Missing[i]
+  if(!is.na(val))
+  {
+    missingImm = c(missingImm, val)
+  }
+}
+
+survivedImm = c()
+for(i in 1:nrow(dataFrame)){
+  val = dataFrame$Number.of.Survivors [i]
+  if(!is.na(val))
+  {
+    survivedImm = c(survivedImm, val)
+  }
+}
+
+all_migrants = deadImm + missingImm + survivedImm
+deadImmProc = deadImm/all_migrants*100
+missingImmProc = missingImm/all_migrants*100
+survivedImmProc = survivedImm/all_migrants*100
+
+boxplot(deadImmProc, main = "Dead immigrants")
+boxplot(missingImmProc, main = "Missing immigrants")
+boxplot(survivedImmProc, main = "Survived immigrants")
+
+pie(c(sum(deadImm), sum(missingImm), sum(survivedImm)),
+    c("Dead immigrants", "Missing immigrants", "Survived immigrants"),
+    main = "How many died/survived/are missing", 
+    col = rainbow(3))
+#rozklad z wartoscia odstajaca, rozklad niesymetryczny, rozklad symetryczny
+```
+
+6) Men, women, children
+```{r}
+men = c()
+for(i in 1:nrow(dataFrame)){
+  val = dataFrame$Number.of.Males[i]
+  if(!is.na(val))
+  {
+    men = c(men, val)
+  }
+}
+
+women = c()
+for(i in 1:nrow(dataFrame)){
+  val = dataFrame$Number.of.Females[i]
+  if(!is.na(val))
+  {
+    women = c(women, val)
+  }
+}
+
+children = c()
+for(i in 1:nrow(dataFrame)){
+  val = dataFrame$Number.of.Children[i]
+  if(!is.na(val))
+  {
+    children = c(children, val)
+  }
+}
+
+pie(c(sum(men), sum(women), sum(children)),
+    c("Men", "Women", "Children"),
+    main = "How many men/women/children", 
+    col = rainbow(3))
+```
+
+
+7) Cause of death:
+```{r}
+causes = c()
+for(i in 1:nrow(dataFrame)){
+  val = dataFrame$Cause.of.Death[i]
+  if(!identical(grep("rowning", val),integer(0)))
+  {
+    causes = c(causes, "Drowning")
+  }
+  else if(!identical(grep("nknown", val),integer(0)))
+  {
+    causes = c(causes, "Unknown")
+  } 
+  else if(!identical(grep("shot", val),integer(0)))
+  {
+    causes = c(causes, "Shot")
+  } 
+  else if(!identical(grep("Shot", val),integer(0)))
+  {
+    causes = c(causes, "Shot")
+  } 
+  else if(!identical(grep("urder", val),integer(0)))
+  {
+    causes = c(causes, "Murder")
+  } 
+  else if(!identical(grep("ehicale", val),integer(0)))
+  {
+    causes = c(causes, "Vehicale Accident")
+  } 
+  else if(!identical(grep("it by", val),integer(0)))
+  {
+    causes = c(causes, "Vehicale Accident")
+  }
+  else if(!identical(grep("ypothermia", val),integer(0)))
+  {
+    causes = c(causes, "Hypothermia")
+  }
+  else if(!identical(grep("ickness", val),integer(0)))
+  {
+    causes = c(causes, "Sickness")
+  }
+  else if(!identical(grep("arvation", val),integer(0)))
+  {
+    causes = c(causes, "Starvation")
+  }
+  else {
+    causes = c(causes, "Other")
+  }
+}
+
+deadImm = c()
+for(i in 1:nrow(dataFrame)){
+  val = dataFrame$Number.Dead[i]
+  if(!is.na(val))
+  {
+    deadImm = c(deadImm, val)
+  }
+  else{
+    deadImm = c(deadImm, 0)
+  }
+}
+
+dataFrame3 <- data.frame(Amount = deadImm, Cause = causes)
+Causes_sum <- aggregate(dataFrame3$Amount, by=list(Cause=dataFrame3$Cause), FUN=sum)
+
+barplot(Causes_sum$x,
+        main = "Causes of death",
+        xlab = "Amount of deaths",
+        ylab = "Cause of death",
+        names.arg = Causes_sum$Cause,
+        col = "green")
+
+```
+
+
+
+
+
+
+
+
+
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).
+
+The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.
